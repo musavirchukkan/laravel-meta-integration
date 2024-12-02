@@ -38,3 +38,5 @@ auth.json
 .php_cs.cache
 .php-cs.cache
 build
+*.swp
+*.swo

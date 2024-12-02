@@ -1,63 +1,45 @@
 <?php
 
-namespace MusavirChukkan\MetaIntegration;
+namespace Musavirchukkan\LaravelMetaIntegration;
 
 use Illuminate\Support\ServiceProvider;
-use MusavirChukkan\MetaIntegration\Support\MetaClient;
-use MusavirChukkan\MetaIntegration\Services\ConnectionService;
-use MusavirChukkan\MetaIntegration\Contracts\ConnectionServiceInterface;
-use MusavirChukkan\MetaIntegration\Contracts\InsightsServiceInterface;
-use MusavirChukkan\MetaIntegration\Contracts\WebhookServiceInterface;
+use Musavirchukkan\LaravelMetaIntegration\Contracts\MetaClientInterface;
+use Musavirchukkan\LaravelMetaIntegration\Support\MetaClient;
 use MusavirChukkan\MetaIntegration\Facades\Meta;
-use MusavirChukkan\MetaIntegration\Services\InsightsService;
-use MusavirChukkan\MetaIntegration\Services\WebhookService;
+use MusavirChukkan\MetaIntegration\Support\MetaClient as SupportMetaClient;
 
 class MetaServiceProvider extends ServiceProvider
 {
-    public function register(): void
+    public function register()
     {
-        // Register config
         $this->mergeConfigFrom(
             __DIR__.'/../config/meta.php', 'meta'
         );
 
-        // Register MetaClient
-        $this->app->singleton(MetaClient::class, function ($app) {
-            return new MetaClient();
-        });
-
-        // Register Connection Service
-        $this->app->singleton(ConnectionServiceInterface::class, ConnectionService::class);
-
-        // Register Main Service
-        $this->app->singleton('meta', function ($app) {
-            return new Meta(
-                $app->make(ConnectionServiceInterface::class)
+        $this->app->singleton(MetaClientInterface::class, function ($app) {
+            return new SupportMetaClient(
+                config('meta.app_id'),
+                config('meta.app_secret'),
+                config('meta.api_version')
             );
         });
 
-        // Register Insights Service
-        $this->app->singleton(InsightsServiceInterface::class, InsightsService::class);
-
-        // Register Webhook Service
-        $this->app->singleton(WebhookServiceInterface::class, WebhookService::class);
-
-        // Update Meta binding
         $this->app->singleton('meta', function ($app) {
-            return new Meta(
-                $app->make(ConnectionServiceInterface::class),
-                $app->make(InsightsServiceInterface::class),
-                $app->make(WebhookServiceInterface::class)
-            );
+            return new Meta($app->make(MetaClientInterface::class));
         });
     }
 
-    public function boot(): void
+    public function boot()
     {
-        if ($this->app->runningInConsole()) {
-            $this->publishes([
-                __DIR__.'/../config/meta.php' => config_path('meta.php'),
-            ], 'meta-config');
-        }
+        $this->publishes([
+            __DIR__.'/../config/meta.php' => config_path('meta.php'),
+        ], 'config');
+
+        $this->publishes([
+            __DIR__.'/../database/migrations/' => database_path('migrations'),
+        ], 'migrations');
+
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
     }
 }
