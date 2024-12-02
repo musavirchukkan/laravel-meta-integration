@@ -6,6 +6,11 @@ use Illuminate\Support\ServiceProvider;
 use MusavirChukkan\MetaIntegration\Support\MetaClient;
 use MusavirChukkan\MetaIntegration\Services\ConnectionService;
 use MusavirChukkan\MetaIntegration\Contracts\ConnectionServiceInterface;
+use MusavirChukkan\MetaIntegration\Contracts\InsightsServiceInterface;
+use MusavirChukkan\MetaIntegration\Contracts\WebhookServiceInterface;
+use MusavirChukkan\MetaIntegration\Facades\Meta;
+use MusavirChukkan\MetaIntegration\Services\InsightsService;
+use MusavirChukkan\MetaIntegration\Services\WebhookService;
 
 class MetaServiceProvider extends ServiceProvider
 {
@@ -28,6 +33,21 @@ class MetaServiceProvider extends ServiceProvider
         $this->app->singleton('meta', function ($app) {
             return new Meta(
                 $app->make(ConnectionServiceInterface::class)
+            );
+        });
+
+        // Register Insights Service
+        $this->app->singleton(InsightsServiceInterface::class, InsightsService::class);
+
+        // Register Webhook Service
+        $this->app->singleton(WebhookServiceInterface::class, WebhookService::class);
+
+        // Update Meta binding
+        $this->app->singleton('meta', function ($app) {
+            return new Meta(
+                $app->make(ConnectionServiceInterface::class),
+                $app->make(InsightsServiceInterface::class),
+                $app->make(WebhookServiceInterface::class)
             );
         });
     }
