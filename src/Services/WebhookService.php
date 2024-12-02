@@ -98,4 +98,54 @@ class WebhookService implements WebhookServiceInterface
             throw new MetaException('Failed to handle webhook: ' . $e->getMessage());
         }
     }
+
+    public function subscribeToEvents(string $pageId, string $token, array $events): array
+    {
+        $validEvents = [
+            'leadgen',
+            'feed',
+            'messages',
+            'messaging_postbacks',
+            'messaging_optins',
+            'page_feedback'
+        ];
+
+        $events = array_intersect($events, $validEvents);
+
+        return $this->subscribe($pageId, $token, $events);
+    }
+
+    public function getSubscriptionStatus(string $pageId, string $token): array
+    {
+        $this->client->setAccessToken($token);
+        
+        return $this->client->request('GET', "{$pageId}/subscribed_apps");
+    }
+
+    public function processLeadgenEvent(array $data): array
+    {
+        // Process lead generation webhook data
+        $formId = $data['form_id'];
+        $leadId = $data['lead_id'];
+        $pageId = $data['page_id'];
+        
+        return [
+            'type' => 'leadgen',
+            'form_id' => $formId,
+            'lead_id' => $leadId,
+            'page_id' => $pageId,
+            'created_time' => $data['created_time'] ?? now()
+        ];
+    }
+
+    public function processFeedEvent(array $data): array
+    {
+        // Process page feed webhook data
+        return [
+            'type' => 'feed',
+            'post_id' => $data['post_id'],
+            'action' => $data['verb'] ?? 'unknown',
+            'created_time' => $data['created_time'] ?? now()
+        ];
+    }
 }

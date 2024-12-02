@@ -121,4 +121,56 @@ class InsightsService implements InsightsServiceInterface
 
         return $response['data'];
     }
+
+    public function getDemographicInsights(string $campaignId, string $token): array
+    {
+        return $this->cached("demographic_{$campaignId}", function () use ($campaignId, $token) {
+            $this->client->setAccessToken($token);
+            
+            return $this->client->request('GET', "{$campaignId}/insights", [
+                'fields' => 'age,gender,impressions,clicks,conversions',
+                'breakdowns' => 'age,gender',
+                'level' => 'campaign'
+            ]);
+        });
+    }
+
+    public function getLocationInsights(string $campaignId, string $token): array
+    {
+        return $this->cached("location_{$campaignId}", function () use ($campaignId, $token) {
+            $this->client->setAccessToken($token);
+            
+            return $this->client->request('GET', "{$campaignId}/insights", [
+                'fields' => 'region,impressions,clicks,conversions',
+                'breakdowns' => 'region',
+                'level' => 'campaign'
+            ]);
+        });
+    }
+
+    public function getDeviceInsights(string $campaignId, string $token): array
+    {
+        return $this->cached("device_{$campaignId}", function () use ($campaignId, $token) {
+            $this->client->setAccessToken($token);
+            
+            return $this->client->request('GET', "{$campaignId}/insights", [
+                'fields' => 'device_platform,impressions,clicks,conversions',
+                'breakdowns' => 'device_platform',
+                'level' => 'campaign'
+            ]);
+        });
+    }
+
+    public function getCostAnalysis(string $accountId, string $token, string $timeRange = 'last_30_days'): array
+    {
+        return $this->cached("cost_analysis_{$accountId}_{$timeRange}", function () use ($accountId, $token, $timeRange) {
+            $this->client->setAccessToken($token);
+            
+            return $this->client->request('GET', "act_{$accountId}/insights", [
+                'fields' => 'spend,cpc,cpm,cpp,ctr,frequency',
+                'date_preset' => $timeRange,
+                'level' => 'account'
+            ]);
+        });
+    }
 }
