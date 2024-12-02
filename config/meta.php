@@ -3,25 +3,53 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Meta API Configuration
+    | Meta (Facebook) Application Settings
     |--------------------------------------------------------------------------
     */
 
-    'client_id' => env('META_CLIENT_ID'),
-    'client_secret' => env('META_CLIENT_SECRET'),
+    'app_id' => env('META_APP_ID'),
+    'app_secret' => env('META_APP_SECRET'),
+    
+    /*
+    |--------------------------------------------------------------------------
+    | API Configuration
+    |--------------------------------------------------------------------------
+    */
+    
+    'api_version' => env('META_API_VERSION', 'v18.0'),
     'redirect_url' => env('META_REDIRECT_URL'),
-    'app_token' => env('META_APP_TOKEN'),
     
-    'graph_url' => env('META_GRAPH_URL', 'https://graph.facebook.com/'),
-    'graph_version' => env('META_GRAPH_VERSION', 'v18.0'),
+    /*
+    |--------------------------------------------------------------------------
+    | Webhook Configuration
+    |--------------------------------------------------------------------------
+    */
     
-    'cache' => [
-        'enabled' => true,
-        'ttl' => 3600, // 1 hour
+    'webhook_verify_token' => env('META_WEBHOOK_VERIFY_TOKEN'),
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Required Permissions
+    |--------------------------------------------------------------------------
+    */
+    
+    'permissions' => [
+        'email',
+        'leads_retrieval',
+        'pages_manage_metadata',
+        'pages_show_list',
+        'pages_manage_ads',
+        'business_management',
+        'pages_read_engagement',
+        'ads_management',
+        'ads_read'
     ],
     
-    'rate_limit' => [
-        'max_attempts' => 200,  // Per hour
-        'decay_minutes' => 60
-    ]
+    /*
+    |--------------------------------------------------------------------------
+    | Logging Configuration
+    |--------------------------------------------------------------------------
+    */
+    
+    'log_channel' => env('META_LOG_CHANNEL', 'stack'),
 ];

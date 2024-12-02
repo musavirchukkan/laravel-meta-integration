@@ -1,176 +1,149 @@
 <?php
 
-namespace MusavirChukkan\MetaIntegration\Services;
+namespace Musavirchukkan\LaravelMetaIntegration\Services;
 
-use MusavirChukkan\MetaIntegration\Support\MetaClient;
-use MusavirChukkan\MetaIntegration\Contracts\InsightsServiceInterface;
-use MusavirChukkan\MetaIntegration\Exceptions\MetaException;
-use Illuminate\Support\Facades\Cache;
+use GuzzleHttp\Client as GuzzleClient;
+use Illuminate\Support\Facades\Log;
+use Musavirchukkan\LaravelMetaIntegration\Exceptions\MetaApiException;
 
-class InsightsService implements InsightsServiceInterface
+class InsightsService
 {
-    protected array $defaultMetrics = [
+    protected $client;
+    protected $apiVersion;
+
+    protected $defaultMetrics = [
         'impressions',
-        'reach',
         'clicks',
         'spend',
+        'reach',
+        'cpm',
         'cpc',
         'ctr',
-        'conversions',
-        'cost_per_conversion'
+        'frequency',
+        'actions',
+        'cost_per_action_type'
     ];
 
-    public function __construct(
-        protected MetaClient $client
-    ) {}
+    public function __construct(GuzzleClient $client)
+    {
+        $this->client = $client;
+        $this->apiVersion = config('meta.api_version', 'v18.0');
+    }
 
+    /**
+     * Get campaign insights
+     */
     public function getCampaignInsights(
-        string $campaignId, 
-        string $token, 
-        array $metrics = [], 
-        string $datePreset = 'last_30_days'
+        string $token,
+        string $campaignId,
+        array $metrics = [],
+        array $params = []
     ): array {
-        $cacheKey = "meta_campaign_insights_{$campaignId}_{$datePreset}";
-
-        return Cache::remember($cacheKey, 3600, function () use ($campaignId, $token, $metrics, $datePreset) {
-            $this->client->setAccessToken($token);
-
-            $response = $this->client->request('GET', "{$campaignId}/insights", [
-                'fields' => $this->prepareMetrics($metrics),
-                'date_preset' => $datePreset,
-                'level' => 'campaign'
-            ]);
-
-            return $this->formatInsightsResponse($response);
-        });
+        return $this->getInsights($token, $campaignId, 'campaign', $metrics, $params);
     }
 
+    /**
+     * Get adset insights
+     */
+    public function getAdSetInsights(
+        string $token,
+        string $adSetId,
+        array $metrics = [],
+        array $params = []
+    ): array {
+        return $this->getInsights($token, $adSetId, 'adset', $metrics, $params);
+    }
+
+    /**
+     * Get ad insights
+     */
     public function getAdInsights(
-        string $adId, 
-        string $token, 
-        array $metrics = [], 
-        string $datePreset = 'last_30_days'
+        string $token,
+        string $adId,
+        array $metrics = [],
+        array $params = []
     ): array {
-        $cacheKey = "meta_ad_insights_{$adId}_{$datePreset}";
-
-        return Cache::remember($cacheKey, 3600, function () use ($adId, $token, $metrics, $datePreset) {
-            $this->client->setAccessToken($token);
-
-            $response = $this->client->request('GET', "{$adId}/insights", [
-                'fields' => $this->prepareMetrics($metrics),
-                'date_preset' => $datePreset,
-                'level' => 'ad'
-            ]);
-
-            return $this->formatInsightsResponse($response);
-        });
+        return $this->getInsights($token, $adId, 'ad', $metrics, $params);
     }
 
+    /**
+     * Get account insights
+     */
     public function getAccountInsights(
-        string $accountId, 
-        string $token, 
-        array $metrics = [], 
-        string $datePreset = 'last_30_days'
+        string $token,
+        string $accountId,
+        array $metrics = [],
+        array $params = []
     ): array {
-        $cacheKey = "meta_account_insights_{$accountId}_{$datePreset}";
+        return $this->getInsights($token, $accountId, 'account', $metrics, $params);
+    }
 
-        return Cache::remember($cacheKey, 3600, function () use ($accountId, $token, $metrics, $datePreset) {
-            $this->client->setAccessToken($token);
+    /**
+     * Generic insights fetcher
+     */
+    protected function getInsights(
+        string $token,
+        string $id,
+        string $level,
+        array $metrics = [],
+        array $params = []
+    ): array {
+        $metrics = !empty($metrics) ? $metrics : $this->defaultMetrics;
+        
+        $defaultParams = [
+            'time_range' => [
+                'since' => date('Y-m-d', strtotime('-30 days')),
+                'until' => date('Y-m-d')
+            ],
+            'time_increment' => 1
+        ];
 
-            $response = $this->client->request('GET', "act_{$accountId}/insights", [
-                'fields' => $this->prepareMetrics($metrics),
-                'date_preset' => $datePreset,
-                'level' => 'account'
+        $params = array_merge($defaultParams, $params);
+
+        try {
+            $endpoint = "https://graph.facebook.com/{$this->apiVersion}/{$id}/insights";
+            
+            $response = $this->client->get($endpoint, [
+                'query' => array_merge([
+                    'access_token' => $token,
+                    'fields' => implode(',', $metrics),
+                    'level' => $level
+                ], $params)
             ]);
 
-            return $this->formatInsightsResponse($response);
-        });
-    }
+            $result = json_decode($response->getBody()->getContents(), true);
 
-    public function getPageInsights(
-        string $pageId, 
-        string $token, 
-        array $metrics = [], 
-        string $datePreset = 'last_30_days'
-    ): array {
-        $cacheKey = "meta_page_insights_{$pageId}_{$datePreset}";
+            return $this->processInsightsResponse($result);
 
-        return Cache::remember($cacheKey, 3600, function () use ($pageId, $token, $metrics, $datePreset) {
-            $this->client->setAccessToken($token);
-
-            $response = $this->client->request('GET', "{$pageId}/insights", [
-                'fields' => $this->prepareMetrics($metrics),
-                'date_preset' => $datePreset,
-                'period' => 'day'
+        } catch (\Exception $e) {
+            Log::error("Failed to fetch {$level} insights", [
+                'error' => $e->getMessage(),
+                'id' => $id
             ]);
-
-            return $this->formatInsightsResponse($response);
-        });
+            throw new MetaApiException("Failed to fetch {$level} insights: " . $e->getMessage());
+        }
     }
 
-    protected function prepareMetrics(array $metrics): string
+    /**
+     * Process insights response
+     */
+    protected function processInsightsResponse(array $response): array
     {
-        return implode(',', !empty($metrics) ? $metrics : $this->defaultMetrics);
-    }
-
-    protected function formatInsightsResponse(array $response): array
-    {
-        if (!isset($response['data']) || empty($response['data'])) {
-            return [];
+        $data = $response['data'] ?? [];
+        
+        // Process action types if present
+        foreach ($data as &$day) {
+            if (isset($day['actions'])) {
+                $day['actions_by_type'] = collect($day['actions'])
+                    ->keyBy('action_type')
+                    ->map(fn($action) => $action['value'])
+                    ->toArray();
+            }
         }
 
-        return $response['data'];
-    }
-
-    public function getDemographicInsights(string $campaignId, string $token): array
-    {
-        return $this->cached("demographic_{$campaignId}", function () use ($campaignId, $token) {
-            $this->client->setAccessToken($token);
-            
-            return $this->client->request('GET', "{$campaignId}/insights", [
-                'fields' => 'age,gender,impressions,clicks,conversions',
-                'breakdowns' => 'age,gender',
-                'level' => 'campaign'
-            ]);
-        });
-    }
-
-    public function getLocationInsights(string $campaignId, string $token): array
-    {
-        return $this->cached("location_{$campaignId}", function () use ($campaignId, $token) {
-            $this->client->setAccessToken($token);
-            
-            return $this->client->request('GET', "{$campaignId}/insights", [
-                'fields' => 'region,impressions,clicks,conversions',
-                'breakdowns' => 'region',
-                'level' => 'campaign'
-            ]);
-        });
-    }
-
-    public function getDeviceInsights(string $campaignId, string $token): array
-    {
-        return $this->cached("device_{$campaignId}", function () use ($campaignId, $token) {
-            $this->client->setAccessToken($token);
-            
-            return $this->client->request('GET', "{$campaignId}/insights", [
-                'fields' => 'device_platform,impressions,clicks,conversions',
-                'breakdowns' => 'device_platform',
-                'level' => 'campaign'
-            ]);
-        });
-    }
-
-    public function getCostAnalysis(string $accountId, string $token, string $timeRange = 'last_30_days'): array
-    {
-        return $this->cached("cost_analysis_{$accountId}_{$timeRange}", function () use ($accountId, $token, $timeRange) {
-            $this->client->setAccessToken($token);
-            
-            return $this->client->request('GET', "act_{$accountId}/insights", [
-                'fields' => 'spend,cpc,cpm,cpp,ctr,frequency',
-                'date_preset' => $timeRange,
-                'level' => 'account'
-            ]);
-        });
+        return [
+            'data' => $data,
+            'paging' => $response['paging'] ?? null
+        ];
     }
 }

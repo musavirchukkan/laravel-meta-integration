@@ -22,21 +22,21 @@
     },
     "autoload": {
         "psr-4": {
-            "MusavirChukkan\\MetaIntegration\\": "src/" 
+             "Musavirchukkan\\LaravelMetaIntegration\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "MusavirChukkan\\MetaIntegration\\Tests\\": "tests/"  
+            "Musavirchukkan\\LaravelMetaIntegration\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "MusavirChukkan\\MetaIntegration\\MetaServiceProvider"
+                "Musavirchukkan\\LaravelMetaIntegration\\MetaServiceProvider"
             ],
             "aliases": {
-                "Meta": "MusavirChukkan\\MetaIntegration\\Facades\\Meta"
+                "Meta": "Musavirchukkan\\LaravelMetaIntegration\\Facades\\Meta"
             }
         }
     },
@@ -51,5 +51,14 @@
         "test": "vendor/bin/phpunit",
         "test-coverage": "vendor/bin/phpunit --coverage-html coverage",
         "format": "vendor/bin/php-cs-fixer fix --allow-risky=yes"
-    }
+    },
+    "keywords": [
+        "laravel",
+        "meta",
+        "facebook",
+        "integration",
+        "facebook-api",
+        "meta-api",
+        "laravel-package"
+    ]
 }
